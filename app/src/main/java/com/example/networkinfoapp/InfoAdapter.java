@@ -15,9 +15,9 @@ public class InfoAdapter extends ArrayAdapter<String> {
 
     private final String[] values;
     private final String[] wifiLabels = {"Connection type: ", "IP Address: ", "Link Speed: ", "Network Id: ",
-    "RSSI: ", "SSID: ", "Hidden SSID: ", " BSSID: ", "Max Download Speed: ", "Max Upload Speed: "};
+    "RSSI: ", "SSID: ", "Hidden SSID: ", " BSSID: ", "Max Download Speed: ", "Max Upload Speed: ", "Latitude: ", "Longitude: "};
     private final String[] mobileLabels = {"Connection type: ", "Cell id: ", "Cell MCC: ", "Cell MNC: ",
-            "Cell PCI: ", "Cell TAC: ", "RSRP: ", "Max Download Speed: ", "Max Upload Speed: "};
+            "Cell PCI: ", "Cell TAC: ", "RSRP: ", "Max Download Speed: ", "Max Upload Speed: ", "Latitude: ", "Longitude: "};
     public InfoAdapter(@NonNull Context context, int resource, @NonNull String[] values) {
         super(context, resource, values);
         this.values = values;

@@ -1,5 +1,6 @@
 package com.example.networkinfoapp;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -7,7 +8,10 @@ import androidx.core.app.ActivityCompat;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.location.Location;
+import android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkCapabilities;
 import android.net.NetworkInfo;
@@ -15,6 +19,8 @@ import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Looper;
+import android.provider.Settings;
 import android.telephony.CellInfo;
 import android.telephony.CellInfoLte;
 import android.telephony.TelephonyManager;
@@ -26,7 +32,15 @@ import android.widget.Toast;
 
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback{
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
+
+public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,8 +49,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         ListView listView = findViewById(R.id.listView);
         Button add = findViewById(R.id.Add);
         Button check = findViewById(R.id.check);
-        String[] wifiInfo = {"Check", "Check", "Check", "Check", "Check", "Check", "Check", "Check", "Check", "Check"};
-        String[] mobileInfo = {"Check", "Check", "Check", "Check", "Check", "Check", "Check", "Check", "Check"};
+        FusedLocationProviderClient fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(
+                MainActivity.this);
+        String[] wifiInfo = {"Check", "Check", "Check", "Check", "Check", "Check", "Check", "Check", "Check", "Check", "Check", "Check"};
+        String[] mobileInfo = {"Check", "Check", "Check", "Check", "Check", "Check", "Check", "Check", "Check", "Check", "Check"};
         check.setOnClickListener(new View.OnClickListener() {
             @SuppressLint("NewApi")
             @RequiresApi(api = Build.VERSION_CODES.P)
@@ -52,14 +68,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     if (connection.equals("MOBILE")) {
                         mobileInfo[0] = connection;
                         boolean permissionGranted = ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-                        if(!permissionGranted)
+                        if (!permissionGranted)
                             ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 200);
                         permissionGranted = ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-                        if(!permissionGranted)
+                        if (!permissionGranted)
                             ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 200);
                         TelephonyManager tm = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
                         List<CellInfo> cellInfoList = tm.getAllCellInfo();
-                        for(int i=0; i<cellInfoList.size(); i++){
+                        for (int i = 0; i < cellInfoList.size(); i++) {
                             CellInfo cellInfo = (CellInfo) cellInfoList.get(i);
                             int cellID, cellMcc, cellMnc, cellPci, cellTac, rsrp, maxDownloadSpeed, maxUploadSpeed;
                             if (cellInfo instanceof CellInfoLte && cellInfo.isRegistered()) {
@@ -78,16 +94,85 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                                 cellTac = ((CellInfoLte) cellInfo).getCellIdentity().getTac();
                                 mobileInfo[5] = String.valueOf(cellTac);
                                 // gets RSRP cell signal strength:
-                                rsrp = ((CellInfoLte)cellInfo).getCellSignalStrength().getDbm();
+                                rsrp = ((CellInfoLte) cellInfo).getCellSignalStrength().getDbm();
                                 mobileInfo[6] = rsrp + " dbm";
-                                maxDownloadSpeed = nc.getLinkDownstreamBandwidthKbps()/1000;
+                                maxDownloadSpeed = nc.getLinkDownstreamBandwidthKbps() / 1000;
                                 mobileInfo[7] = maxDownloadSpeed + " MBPS";
-                                maxUploadSpeed = nc.getLinkUpstreamBandwidthKbps()/1000;
+                                maxUploadSpeed = nc.getLinkUpstreamBandwidthKbps() / 1000;
                                 mobileInfo[8] = maxUploadSpeed + " MBPS";
                             }
-
-                            InfoAdapter wa = new InfoAdapter(MainActivity.this, R.layout.wifi_layout, mobileInfo);
-                            listView.setAdapter(wa);
+                            permissionGranted = ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+                            if (!permissionGranted)
+                                ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 200);
+                            permissionGranted = ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+                            if (!permissionGranted)
+                                ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 200);
+                            LocationManager locationManager = (LocationManager) getSystemService(
+                                    Context.LOCATION_SERVICE
+                            );
+                            if (locationManager.isProviderEnabled(locationManager.GPS_PROVIDER) ||
+                                    locationManager.isProviderEnabled(locationManager.NETWORK_PROVIDER)) {
+                                //when location service is enabled
+                                //get last location
+                                fusedLocationProviderClient.getLastLocation().addOnCompleteListener(new OnCompleteListener<Location>() {
+                                    @Override
+                                    public void onComplete(@NonNull Task<Location> task) {
+                                        //initialize location
+                                        Location location = task.getResult();
+                                        //check condition
+                                        if (location != null) {
+                                            //when location is not null
+                                            //set long and latitude
+                                            String latitude = String.valueOf(location.getLatitude());
+                                            mobileInfo[9] = latitude;
+                                            String longitude = String.valueOf(location.getLongitude());
+                                            mobileInfo[10] = longitude;
+                                            Log.d("testing", latitude);
+                                            Log.d("testing", longitude);
+                                        } else {
+                                            //when location result is null
+                                            // Initialize request
+                                            com.google.android.gms.location.LocationRequest locationRequest = new com.google.android.gms.location.LocationRequest()
+                                                    .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
+                                                    .setInterval(10000)
+                                                    .setFastestInterval(1000)
+                                                    .setNumUpdates(1);
+                                            //Initialize location call back
+                                            LocationCallback locationCallback = new LocationCallback() {
+                                                @Override
+                                                public void onLocationResult(@NonNull LocationResult locationResult) {
+                                                    //super.onLocationResult(locationResult);
+                                                    Location location1 = locationResult.getLastLocation();
+                                                    String latitude = String.valueOf(location.getLatitude());
+                                                    mobileInfo[9] = latitude;
+                                                    String longitude = String.valueOf(location.getLongitude());
+                                                    mobileInfo[10] = longitude;
+                                                    Log.d("testing", String.valueOf(location1));
+                                                    Log.d("testing", latitude);
+                                                    Log.d("testing", longitude);
+                                                }
+                                            };
+                                            boolean permissionGranted1 = ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+                                            if (!permissionGranted1)
+                                                ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 200);
+                                            permissionGranted1 = ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+                                            if (!permissionGranted1)
+                                                ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 200);
+                                            LocationManager locationManager = (LocationManager) getSystemService(
+                                                    Context.LOCATION_SERVICE);
+                                            fusedLocationProviderClient.requestLocationUpdates(locationRequest,
+                                                    locationCallback, Looper.myLooper());
+                                        }
+                                        InfoAdapter wa = new InfoAdapter(MainActivity.this, R.layout.wifi_layout, mobileInfo);
+                                        listView.setAdapter(wa);
+                                    }
+                                });
+                            }else{
+                                //when location service is not enabled
+                                // open location settings
+                                startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                                        .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                            }
                         }
 
                     }
@@ -117,8 +202,73 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         wifiInfo[8] = maxDownloadSpeed + " MBPS";
                         int maxUploadSpeed = nc.getLinkUpstreamBandwidthKbps()/1000;
                         wifiInfo[9] = maxUploadSpeed + " MBPS";
-                        InfoAdapter wa = new InfoAdapter(MainActivity.this, R.layout.wifi_layout, wifiInfo);
-                        listView.setAdapter(wa);
+                        LocationManager locationManager = (LocationManager) getSystemService(
+                                Context.LOCATION_SERVICE
+                        );
+                        if(locationManager.isProviderEnabled(locationManager.GPS_PROVIDER) ||
+                                locationManager.isProviderEnabled(locationManager.NETWORK_PROVIDER)){
+                            //when location service is enabled
+                            //get last location
+                            fusedLocationProviderClient.getLastLocation().addOnCompleteListener(new OnCompleteListener<Location>() {
+                                @Override
+                                public void onComplete(@NonNull Task<Location> task) {
+                                    //initialize location
+                                    Location location = task.getResult();
+                                    //check condition
+                                    if(location != null){
+                                        //when location is not null
+                                        //set long and latitude
+                                        String latitude = String.valueOf(location.getLatitude());
+                                        wifiInfo[10] = latitude;
+                                        String longitude = String.valueOf(location.getLongitude());
+                                        wifiInfo[11] = longitude;
+                                        Log.d("testing", latitude);
+                                        Log.d("testing", longitude);
+                                    } else{
+                                        //when location result is null
+                                        // Initialize request
+                                        com.google.android.gms.location.LocationRequest locationRequest = new com.google.android.gms.location.LocationRequest()
+                                                .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
+                                                .setInterval(10000)
+                                                .setFastestInterval(1000)
+                                                .setNumUpdates(1);
+                                        //Initialize location call back
+                                        LocationCallback locationCallback = new LocationCallback() {
+                                            @Override
+                                            public void onLocationResult(@NonNull LocationResult locationResult) {
+                                                //super.onLocationResult(locationResult);
+                                                Location location1 = locationResult.getLastLocation();
+                                                String latitude = String.valueOf(location.getLatitude());
+                                                wifiInfo[10] = latitude;
+                                                String longitude = String.valueOf(location.getLongitude());
+                                                wifiInfo[11] = longitude;
+                                                Log.d("testing", String.valueOf(location1));
+                                                Log.d("testing", latitude);
+                                                Log.d("testing", longitude);
+                                            }
+                                        };
+                                        boolean permissionGranted1 = ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+                                        if (!permissionGranted1)
+                                            ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 200);
+                                        permissionGranted1 = ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+                                        if (!permissionGranted1)
+                                            ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, 200);
+                                        LocationManager locationManager = (LocationManager) getSystemService(
+                                                Context.LOCATION_SERVICE);
+                                        fusedLocationProviderClient.requestLocationUpdates(locationRequest,
+                                                locationCallback, Looper.myLooper());
+                                    }
+                                    InfoAdapter wa = new InfoAdapter(MainActivity.this, R.layout.wifi_layout, wifiInfo);
+                                    listView.setAdapter(wa);
+                                }
+                            });
+                        }else{
+                            //when location service is not enabled
+                            // open location settings
+                            startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                                    .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                        }
+
                     }
                 }
                 //else
